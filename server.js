@@ -1,134 +1,304 @@
-import express from 'express';
+import axios from 'axios';
+import winston from 'winston';
+import chalk from 'chalk';
+import { JSDOM } from 'jsdom';
+import jquery from 'jquery';
+
+const logger = winston.createLogger();
+
+logger.add(new winston.transports.Console({
+	format: winston.format.simple(),
+}));
+
+const { window } = new JSDOM();
+const { document } = (new JSDOM('')).window;
+global.document = document;
+
+const $ = jquery(window);
 
 const config = {
-	keywords: 'rtx 3080 asus strix',
+	// keywords: 'rtx 3080 asus strix',
+	keywords: 'kindle paperwhite',
 	stores: [
 		{
 			name: 'ardes',
-			url: 'https://ardes.bg/products?q=',
+			homeUrl: 'https://ardes.bg',
+			searchPageUrl: '/products?q=',
 			productSelector: '.products-holder .product',
+			titleSelector: '.title',
 			availabilityType: 'listing-exists',
 		},
-		{
-			name: 'ozone',
-			url: 'https://www.ozone.bg/instantsearchplus/result/?q=',
-			productSelector: '.isp_grid_product',
-			availabilityType: 'listing-exists',
-		},
-		{
-			name: 'jarcomputers',
-			url: 'https://www.jarcomputers.com/search?q=',
-			productSelector: '#product_list .hProduct',
-			availabilityType: 'listing-indicator',
-		},
+		// uses ajax for products - neat
+		// {
+		// 	name: 'ozone',
+		// 	homeUrl: 'https://www.ozone.bg/',
+		// 	searchPageUrl: 'instantsearchplus/result/?q=',
+		// 	productSelector: '.isp_grid_product',
+		// 	titleSelector: '.isp_product_title',
+		// 	availabilityType: 'listing-exists',
+		// },
+		// ajax to load stock indicator
+		// {
+		// 	name: 'jarcomputers',
+		// 	homeUrl: 'https://www.jarcomputers.com/',
+		// 	searchPageUrl: 'search?q=',
+		// 	productSelector: '#product_list .hProduct',
+		// 	titleSelector: '.long_title',
+		// 	availabilityType: 'listing-indicator',
+		// 	listingIndicatorSelector: '.list_avail .none',
+		// },
 		{
 			name: 'gplay',
-			url: 'https://gplay.bg/%D1%82%D1%8A%D1%80%D1%81%D0%B5%D0%BD%D0%B5?search_text=',
+			homeUrl: 'https://gplay.bg/',
+			searchPageUrl: '%D1%82%D1%8A%D1%80%D1%81%D0%B5%D0%BD%D0%B5?search_text=',
 			productSelector: '.product-item',
+			titleSelector: '.product-name',
 			availabilityType: 'listing-indicator',
-			listingIndicatorSelector: '.product-status .bg-success',
+			listingIndicatorSelector: '.product-status .bg-danger',
 		},
 		// indicator hard to check
 		// {
 		// 	name: 'desktop.bg',
-		// 	url: 'https://desktop.bg/search?q=',
+		// 	homeUrl: 'https://desktop.bg/',
+		// 	searchPageUrl: 'search?q=',
 		// 	productSelector: '.products li',
 		// 	availabilityType: 'listing-indicator',
 		// 	listingIndicatorSelector: '.product-status .bg-success',
 		// },
 		{
 			name: 'plasico',
-			url: 'https://plasico.bg/tyrsene/',
+			homeUrl: 'https://plasico.bg/',
+			searchPageUrl: 'tyrsene/',
 			productSelector: '#list-results .product-box',
+			titleSelector: '.ttl',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'plesio',
-			url: 'https://plesio.bg/search.html?keyword=',
+			homeUrl: 'https://plesio.bg/',
+			searchPageUrl: 'search.html?keyword=',
 			productSelector: '.productListItem',
+			titleSelector: '.productTitle',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'pic.bg',
-			url: 'https://www.pic.bg/search/',
+			homeUrl: 'https://www.pic.bg/',
+			searchPageUrl: 'search/',
 			productSelector: '.product-item-holder',
+			titleSelector: '.title',
 			availabilityType: 'listing-exists',
 		},
 		// funky search not like the others
 		// {
 		// 	name: 'stokatastoki.bg',
-		// 	url: 'https://www.stokatastoki.bg/index.php?route=product/search&search=',
+		// 	homeUrl: 'https://www.stokatastoki.bg/',
+		// 	searchPageUrl: 'index.php?route=product/search&search=',
 		// 	productSelector: '.product-item-holder',
 		// 	availabilityType: 'listing-exists',
 		// },
 		{
 			name: 'cybertrade.bg',
-			url: 'https://www.cybertrade.bg/product/search?search=',
+			homeUrl: 'https://www.cybertrade.bg/',
+			searchPageUrl: 'product/search?search=',
 			productSelector: '.product-layout',
+			titleSelector: '.caption > h4 > a',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'computer-store.bg',
-			url: 'https://computer-store.bg/search?q=',
+			homeUrl: 'https://computer-store.bg/',
+			searchPageUrl: 'search?q=',
 			productSelector: '#products-container .product',
+			titleSelector: 'h3 > a[itemprop="name"]',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'omni.bg',
-			url: 'https://omni.bg/search.html?phrase=',
-			productSelector: '.c-product-grid__wrapper',
+			homeUrl: 'https://omni.bg/',
+			searchPageUrl: 'search.html?phrase=',
+			productSelector: '.c-product-grid__hover-product-info',
+			titleSelector: '.c-product-grid__product-title-link',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'comshop.bg',
-			url: 'https://comshop.bg/products/search?s=',
-			productSelector: '.card-content-item',
+			homeUrl: 'https://comshop.bg/',
+			searchPageUrl: 'products/search?s=',
+			productSelector: '.product',
+			titleSelector: '.card-content-item--product-info > h5 > a',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'fly.bg',
-			url: 'https://fly.bg/index.php?route=index&action=listing&q=',
+			homeUrl: 'https://fly.bg/',
+			searchPageUrl: 'index.php?route=index&action=listing&q=',
 			productSelector: '#products_listing_container > div[data-identifier="product_item"]',
+			titleSelector: '.product-title-listing',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'megamag.bg',
-			url: 'https://megamag.bg/all-products?key=',
+			homeUrl: 'https://megamag.bg/',
+			searchPageUrl: 'all-products?key=',
 			productSelector: '#products-list .prod-col',
+			titleSelector: '.product-title',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'technopolis.bg',
-			url: 'https://www.technopolis.bg/en/search/?query=',
-			productSelector: '#products-list .prod-col',
+			homeUrl: 'https://www.technopolis.bg/',
+			searchPageUrl: 'en/search/?query=',
+			productSelector: '.products-grid-list .list-item',
+			titleSelector: '.item-name a',
 			availabilityType: 'listing-exists',
 		},
-		{
-			name: 'technomarket.bg',
-			url: 'https://www.technomarket.bg/search?query=',
-			productSelector: 'tm-product-filter-list > div',
-			availabilityType: 'listing-exists',
-		},
+		// {
+		// 	name: 'technomarket.bg',
+		// 	homeUrl: 'https://www.technomarket.bg/',
+		// 	searchPageUrl: 'search?query=',
+		// 	productSelector: 'tm-product-filter-list > div',
+		// 	titleSelector: '.title-link',
+		// 	availabilityType: 'listing-exists',
+		// },
 		{
 			name: 'pcbuild.bg',
-			url: 'https://pcbuild.bg/search/search=',
+			homeUrl: 'https://pcbuild.bg/',
+			searchPageUrl: 'search/search=',
 			productSelector: '.products-list .product-item',
+			titleSelector: '.product-title',
 			availabilityType: 'listing-exists',
 		},
 		{
 			name: 'emag.bg',
-			url: 'https://www.emag.bg/search/',
+			homeUrl: 'https://www.emag.bg/',
+			searchPageUrl: 'search/',
 			productSelector: '#card_grid .card-item',
+			titleSelector: '.product-title',
 			availabilityType: 'listing-exists',
 		},
 		{
-			name: 'emag.bg',
-			url: 'https://www.olx.bg/ads/q-',
+			name: 'olx.bg',
+			homeUrl: 'https://www.olx.bg/',
+			searchPageUrl: 'ads/q-',
 			keywordSeparator: '-',
 			trailingslash: true,
 			productSelector: '.offers .wrap',
+			titleSelector: '.title-cell a strong',
 			availabilityType: 'listing-exists',
 		},
 	],
 };
 
+const start = async () => {
+	const keywords = config.keywords.toLowerCase();
+	const keywordsParts = keywords.split(/\s+/g);
+	const totalKeywords = keywordsParts.length;
+	const stores   = config.stores;
+
+	console.log(chalk.red(`Start search for - ${keywords}...`));
+
+	for (let store of stores) {
+		let url = getStoreSearchPageUrl(store);
+		let searchTerm = '';
+		if (store.hasOwnProperty('keywordSeparator')) {
+			searchTerm = keywords.replace(/\s+/g, store.keywordSeparator);
+		} else {
+			searchTerm = keywords.replace(/\s+/g, '%20');
+		}
+
+		url += searchTerm;
+
+		if (store.hasOwnProperty('trailingslash')) {
+			url += '/';
+		}
+
+		let response;
+
+		try {
+			response = await makeCall(url);
+		} catch (e) {
+			logger.info(`[${store.name}] - not accessible`);
+			console.log(e);
+			continue;
+		}
+
+		const pageMarkup = response.data;
+		const $page      = $(pageMarkup);
+		const $products  = $page.find(store.productSelector);
+
+		if (! $products.length) {
+			logger.info(`[${store.name}] ` + chalk.red('NOT FOUND'));
+			continue;
+		}
+
+		let productUrl = false;
+
+		$products.each(function () {
+			if (productUrl) {
+				return;
+			}
+
+			var $product = $(this);
+			if (store.availabilityType === 'listing-indicator') {
+				if ($product.find(store.listingIndicatorSelector).length) {
+					// if indicator is present, product is out of stock
+
+					return;
+				}
+			}
+
+			const $title = $product.find(store.titleSelector);
+			if (! $title.length) {
+				console.log('can\'t find title - wat do');
+				return;
+			}
+
+			const titleText = $title.text().toLowerCase();
+
+			let keywordCounter = 0;
+
+			for (let keyword of keywordsParts) {
+				if (titleText.indexOf(keyword) !== -1) {
+					keywordCounter+=1;
+				}
+			}
+
+			if (totalKeywords === keywordCounter) {
+				productUrl = getProductFullUrl(store.homeUrl, $product.find('a').first().attr('href'));
+				return;
+			}
+		});
+
+		let message = `[${store.name}] `;
+
+		if (productUrl) {
+			let inStockText = chalk.green('IN STOCK');
+			let urlText     = chalk.magenta(productUrl);
+
+			message += `${inStockText} - ${urlText}`;
+		} else {
+			message += chalk.red('NOT FOUND');
+		}
+
+		logger.info(message);
+	}
+
+	start();
+};
+
+const makeCall = async (url) => {
+	return await axios.get(url);
+};
+
+const getProductFullUrl = (storeUrl, productUrl) => {
+	let fullUrl = productUrl.replace(storeUrl, '');
+
+	return storeUrl + fullUrl;
+};
+
+const getStoreSearchPageUrl = (store) => {
+	return store.homeUrl + store.searchPageUrl;
+};
+
+start();
